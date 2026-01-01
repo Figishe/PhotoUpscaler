@@ -1,7 +1,7 @@
 import asyncio
 from io import BytesIO
 from PIL import Image
-from telegram import Update
+from telegram import Update, Message, Document
 from telegram.ext import ApplicationBuilder, Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram import Bot
 
@@ -15,14 +15,25 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 queue = asyncio.Queue()
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    assert update.message, "message can't be null in start handler"
     await update.message.reply_text(
         "Привет! Отправьте изображение как файл, и я увеличу его разрешение."
     )
 
-async def handle_file(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    assert update.message, "message can't be null in message handler"
+
+    if update.message.photo:
+        await update.message.reply_text("Пожалуйста, отправьте изображение именно как файл")
+        return
+
     document = update.message.document
     if not document:
-        await update.message.reply_text("Пожалуйста, отправьте именно файл изображения.")
+        await update.message.reply_text("Пожалуйста, отправьте файл изображения")
+        return
+    
+    if document.mime_type is None or not document.mime_type.startswith("image/"):
+        await update.message.reply_text(f"Незнакомый тип файла {document.mime_type}; поддерживаются jped, png и др.")
         return
 
     file = await document.get_file()
@@ -63,7 +74,7 @@ def main():
     )
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.Document.IMAGE, handle_file))
+    app.add_handler(MessageHandler(filters=None, callback=handle_message))
 
     app.run_polling()
 
