@@ -64,6 +64,9 @@ async def worker(app: Application):
         queue.task_done()
 
 def main():
+    if BOT_TOKEN is None:
+        raise Exception("BOT_TOKEN should be specified in .env")
+
     async def post_init(app):
         app.create_task(worker(app))
 
