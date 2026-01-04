@@ -4,45 +4,104 @@ import torch.functional as F
 
 class UpscaleBlock(nn.Module):
 
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels, length=2, head_activation=True):
         super().__init__()
-        # TODO: how to add pixelshuffle?
+        
+        RELU_SLOPE = 0.1
+
+        self.layers = nn.Sequentian()
+        for i in range(length-1): # head always goes last
+            layer = nn.Conv2d(
+                in_channels=in_channels, 
+                out_channels=in_channels, 
+                kernel_size=3, stride=1, 
+                padding=1
+            )
+            self.layers.add_module(layer)
+            
+            activation = nn.LeakyReLU(
+                negative_slope=RELU_SLOPE, 
+                inplace=True,
+            )
+            self.layers.add_module(activation)
+        
+        self.upscaler = nn.PixelShuffle(upscale_factor=2)
+
+        if head_activation:
+            self.head_activation = nn.LeakyReLU(
+                negative_slope=RELU_SLOPE, 
+                inplace=True,
+            )
+        else:
+            self.head_activation = None
     
     def forward(self, x):
-        pass
+        x = self.layers(x)
+        x = self.upscaler(x)
+        if self.head_activation is not None:
+            x = self.head_activation(x)
+        return x
 
 class DownscaleBlock(nn.Module):
-
-    def __init__(self, in_channels, out_channels):
+    
+    def __init__(self, in_channels, length=3):
         super().__init__()
-        # TODO: how to sync in out channels?
+        
+        RELU_SLOPE = 0.1
+
+        self.layers = nn.Sequential()
+        for i in range(length-1): # head always goes last
+            layer = nn.Conv2d(
+                in_channels=in_channels, 
+                out_channels=in_channels, 
+                kernel_size=3, stride=1, 
+                padding=1
+            )
+            self.layers.add_module(layer)
+            
+            activation = nn.LeakyReLU(
+                negative_slope=RELU_SLOPE, 
+                inplace=(i>0), # first tensor is used in FPN and should not be modified
+            )
+            self.layers.add_module(activation)
+        
+        self.downscale = nn.AvgPool2d(kernel_size=2, stride=1)
+        self.head_activation = nn.LeakyReLU(
+                negative_slope=RELU_SLOPE, 
+                inplace=(i>0), # first tensor is used in FPN and should not be modified
+            )
 
     def forward(self, x):
-        pass
+        x = self.layers(x)
+        x = self.downscale(x)
+        x = self.head_activation(x)
+        return x
 
 
-class SuperResUpscaler(nn.Module):
+class SuperResNet(nn.Module):
 
-    def __init__(self, in_hw, start_channels=16, depth=3):
+    def __init__(self, start_channels=64, depth=3):
         super().__init__()
-
+        
         PIC_CHANNELS = 3
         self.tail = nn.Conv2d(in_channels=PIC_CHANNELS, out_channels=start_channels, kernel_size=1)
         downscale_layers = nn.ModuleList()
 
-        CHANNELS_SCALE = 2
+        CHANNELS_DOWNSCALE = 2
 
         curr_channels = start_channels
         for i in range(depth):
-            module = DownscaleBlock(in_channels=curr_channels, out_channels=curr_channels * CHANNELS_SCALE)
+            module = DownscaleBlock(in_channels=curr_channels)
             downscale_layers.add_module(module)
-            curr_channels *= CHANNELS_SCALE
+            curr_channels *= CHANNELS_DOWNSCALE
 
+        CHANNELS_UPSCALE = 4
         upscale_layers = nn.ModuleList()
         for i in range(depth):
-            module = UpscaleBlock(in_channels=curr_channels, out_channels=curr_channels // CHANNELS_SCALE)
+            module = UpscaleBlock(in_channels=curr_channels, head_activation=(i < depth - 1))
             upscale_layers.add_module(module)
-            curr_channels //= CHANNELS_SCALE
+            curr_channels //= CHANNELS_UPSCALE
+            assert curr_channels >= PIC_CHANNELS, f"Not enough start channels: {start_channels}; can't upscale {curr_channels} in block {i}"
 
         self.downscale_layers = downscale_layers
         self.upscale_layers = upscale_layers
