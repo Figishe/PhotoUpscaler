@@ -1,5 +1,11 @@
+jupyter
+ipywidgets
 numpy
+matplotlib
+scikit-image
 torch
+lightning
+tensorboard
 pillow
 python-telegram-bot>=20.0
 Pillow>=10.0
