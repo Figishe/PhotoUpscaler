@@ -54,11 +54,9 @@ class ImageLoggerCallback(L.Callback):
         with torch.no_grad():
             pred = pl_module(x)
 
-        # берём первые 4 картинки из батча
-        img_gt   = y[:4].cpu()
-        img_pred = pred[:4].cpu()
+        img_gt   = y[:].cpu()
+        img_pred = pred[:].cpu()
 
-        # объединяем по каналу C для отображения GT сверху, предсказание снизу
         imgs = torch.cat([img_gt, img_pred], dim=2)  # вертикально
         grid = make_grid(imgs, nrow=4)  # 4 картинки в ряд
 
