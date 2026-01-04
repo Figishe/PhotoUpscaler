@@ -47,18 +47,22 @@ class SuperResDataset(Dataset):
         return X_tensor, Y_tensor
 
     def _pil_to_tensor(self, img):
-        arr = torch.ByteTensor(torch.ByteStorage.from_buffer(img.tobytes()))
-        arr = arr.view(img.size[1], img.size[0], 3)  # HxWxC
-        arr = arr.permute(2, 0, 1).float() / 255.0  # CxHxW
-        return arr
+        x = torch.ByteTensor(torch.ByteStorage.from_buffer(img.tobytes()))
+        x = x.view(img.size[1], img.size[0], 3)  # HxWxC
+        x = x.permute(2, 0, 1).float() / 255.0  # CxHxW
+        x = (x * 2) - 1
+        return x
     
 
     def tensor_to_pil(self, tensor):
         t = tensor.clone()
-        t = torch.clamp(t, 0.0, 1.0)
+        t = torch.clamp(t, -1.0, 1.0)
 
-        # CxHxW -> HxWxC
-        arr = (t.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)
+        arr = t.permute(1, 2, 0) # CxHxW -> HxWxC
+        arr = (arr + 1.0) / 2.0 # [0; 1]
+        arr = arr * 255 # [0; 255]
+        arr = arr.cpu().numpy()
+        arr = arr.astype(np.uint8)
 
         img_rgb = Image.fromarray(arr, mode="sRGB")
 

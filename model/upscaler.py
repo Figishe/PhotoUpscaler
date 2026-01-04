@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.functional as F
+import torch.nn.functional as F
 
 class UpscaleBlock(nn.Module):
 
@@ -9,7 +9,7 @@ class UpscaleBlock(nn.Module):
         
         RELU_SLOPE = 0.1
 
-        self.layers = nn.Sequentian()
+        self.layers = nn.Sequential()
         for i in range(length-1): # head always goes last
             layer = nn.Conv2d(
                 in_channels=in_channels, 
@@ -17,13 +17,13 @@ class UpscaleBlock(nn.Module):
                 kernel_size=3, stride=1, 
                 padding=1
             )
-            self.layers.add_module(layer)
+            self.layers.add_module(module=layer, name=f'u_conv_{in_channels}_{i}')
             
             activation = nn.LeakyReLU(
                 negative_slope=RELU_SLOPE, 
                 inplace=True,
             )
-            self.layers.add_module(activation)
+            self.layers.add_module(module=activation, name=f'u_relu_{i}')
         
         self.upscaler = nn.PixelShuffle(upscale_factor=2)
 
@@ -57,13 +57,13 @@ class DownscaleBlock(nn.Module):
                 kernel_size=3, stride=1, 
                 padding=1
             )
-            self.layers.add_module(layer)
+            self.layers.add_module(module=layer, name=f'd_conv_{in_channels}_{i}')
             
             activation = nn.LeakyReLU(
                 negative_slope=RELU_SLOPE, 
                 inplace=(i>0), # first tensor is used in FPN and should not be modified
             )
-            self.layers.add_module(activation)
+            self.layers.add_module(module=activation, name=f'd_relu_{i}')
         
         self.downscale = nn.AvgPool2d(kernel_size=2, stride=1)
         self.head_activation = nn.LeakyReLU(
@@ -92,14 +92,14 @@ class SuperResNet(nn.Module):
         curr_channels = start_channels
         for i in range(depth):
             module = DownscaleBlock(in_channels=curr_channels)
-            downscale_layers.add_module(module)
+            downscale_layers.add_module(module=module, name=f'u_block_{curr_channels}_{i}')
             curr_channels *= CHANNELS_DOWNSCALE
 
         CHANNELS_UPSCALE = 4
         upscale_layers = nn.ModuleList()
         for i in range(depth):
             module = UpscaleBlock(in_channels=curr_channels, head_activation=(i < depth - 1))
-            upscale_layers.add_module(module)
+            upscale_layers.add_module(module=module, name=f'u_block_{curr_channels}_{i}')
             curr_channels //= CHANNELS_UPSCALE
             assert curr_channels >= PIC_CHANNELS, f"Not enough start channels: {start_channels}; can't upscale {curr_channels} in block {i}"
 
@@ -107,11 +107,14 @@ class SuperResNet(nn.Module):
         self.upscale_layers = upscale_layers
 
         self.head = nn.Sequential()
-        self.head.add_module(in_channels=curr_channels, out_channels=PIC_CHANNELS)
+        head_block = UpscaleBlock(in_channels=curr_channels, head_activation=False)
+        self.head.add_module(module=head_block, name=f'u_head')
     
 
     def forward(self, x):
-        # TODO: augment (blur + noise)
+        # TODO: gpu augment (blur + noise)
+
+        base = F.interpolate(x, scale_factor=2, mode="bilinear", align_corners=False)
 
         x = self.tail(x)
         
@@ -127,4 +130,4 @@ class SuperResNet(nn.Module):
         x = self.head(x)
         x = F.tanh(x)
 
-        return x
+        return base + x
