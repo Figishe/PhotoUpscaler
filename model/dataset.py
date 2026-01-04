@@ -64,7 +64,7 @@ class SuperResDataset(Dataset):
         arr = arr.cpu().numpy()
         arr = arr.astype(np.uint8)
 
-        img_rgb = Image.fromarray(arr, mode="sRGB")
+        img_rgb = Image.fromarray(arr, mode="RGB")
 
         return img_rgb
 

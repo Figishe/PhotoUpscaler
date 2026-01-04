@@ -11,6 +11,7 @@ class LitSuperResNet(L.LightningModule):
         self.model = SuperResNet(start_channels=start_channels, depth=depth)
         self.lr = lr
         self.loss = F.mse_loss
+        self.save_hyperparameters()
 
     def forward(self, x):
         return self.model(x)

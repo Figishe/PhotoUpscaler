@@ -4,6 +4,7 @@ numpy
 matplotlib
 scikit-image
 torch
+torchinfo
 lightning
 tensorboard
 pillow
