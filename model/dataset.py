@@ -1,0 +1,1 @@
+# TODO: crop + normalize to [-1; 1]
