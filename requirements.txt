@@ -4,6 +4,7 @@ numpy
 matplotlib
 scikit-image
 torch
+torchvision
 torchinfo
 lightning
 tensorboard

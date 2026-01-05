@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torchvision.utils import make_grid
 
 class LitSuperResNet(L.LightningModule):
-    def __init__(self, lr=1e-6, start_channels=64, depth=2, downscale_hires=2, downscale_lowres=2):
+    def __init__(self, lr=1e-6, start_channels=64, depth=2, downscale_lowres=2):
         super().__init__()
         self.model = SuperResNet(start_channels=start_channels, depth=depth)
 
@@ -18,7 +18,6 @@ class LitSuperResNet(L.LightningModule):
 
         self.lr = lr
         self.loss = F.mse_loss
-        self.downscale_hires = downscale_hires
         self.downscale_lowres = downscale_lowres
         self.save_hyperparameters()
 
@@ -27,15 +26,8 @@ class LitSuperResNet(L.LightningModule):
 
     @torch.no_grad()
     def batch_preprocess(self, batch):
-        y_hires = batch
-        y_hires = y_hires.to(self.device, non_blocking=True)
-
-        y = F.interpolate(
-            y_hires,
-            scale_factor=1 / self.downscale_hires, # for denoising of original photo
-            mode="bicubic",
-            align_corners=False
-        )
+        y = batch
+        y = y.to(self.device, non_blocking=True)
 
         x = F.interpolate(
             y,

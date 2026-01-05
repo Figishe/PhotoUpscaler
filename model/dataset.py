@@ -4,42 +4,78 @@ from PIL import Image
 import numpy as np
 import torch
 from torch.utils.data import Dataset
+import torchvision.io as tvio
 
 class SuperResDataset(Dataset):
 
-    def __init__(self, root, crop_size=192):
-        self.crop_size = crop_size
-
-        self.paths = []
+    def parse_image_file_paths(self, root):
+        flie_paths = []
         for dirpath, _, filenames in os.walk(root):
             for f in filenames:
                 if f.lower().endswith((".jpg", ".jpeg")) and not f.startswith("._"):
-                    self.paths.append(os.path.join(dirpath, f))
+                    flie_paths.append(os.path.join(dirpath, f))
+        return flie_paths
+
+    current_image = None
+    current_image_id = -1
+
+    def __init__(self, 
+                 root, 
+                 patch_size=128, 
+                 downscale=(2808, 1872) # half-res of Canon 5dII frame
+                ):
+        self.patch_size = patch_size
+
+        self.flie_paths = self.parse_image_file_paths(root)
+
+        image_w, image_h = downscale
+        patches_per_image_w = image_w // patch_size
+        patches_per_image_h = image_h // patch_size
+        self.magrin_w = image_w - (patch_size * patches_per_image_w)
+        self.magrin_h = image_h - (patch_size * patches_per_image_h)
+
+        self.image_w = image_w
+        self.image_h = image_h
+
+        self.patches_per_image_w = patches_per_image_w
+        self.patches_per_image_h = patches_per_image_h
+        self.patches_per_image = patches_per_image_w * patches_per_image_h
+
 
     def __len__(self):
-        return len(self.paths)
+        return len(self.flie_paths) * self.patches_per_image
+
 
     def __getitem__(self, idx):
-        img = Image.open(self.paths[idx])
-        w, h = img.size
+        image_id = idx // self.patches_per_image
+        patch_id = idx % self.patches_per_image
 
-        left = random.randint(0, w - self.crop_size)
-        top  = random.randint(0, h - self.crop_size)
+        if image_id != self.current_image_id:
+            # update cache
+            img = tvio.read_image(self.flie_paths[image_id])
+            img = img.unsqueeze(0)  # add batch dim (compatible with interpolate)
+            img = torch.nn.functional.interpolate(img, size=(self.image_h, self.image_w), mode="bicubic", align_corners=False)
+            img = img.squeeze(0)
+            img = img.float() / 255.0
+            img = img * 2 - 1
+            self.current_image_id = image_id
+            self.current_image = img
 
-        Y = img.crop((left, top,
-                      left + self.crop_size,
-                      top + self.crop_size))
+            # Randomize patch loading (because native shuffle=True will not work with the image cache)
+            self.patch_indices = [(i,j) for i in range(self.patches_per_image_h) for j in range(self.patches_per_image_w)]
+            random.shuffle(self.patch_indices)
+        else:
+            # continue taking patches from the cached image
+            img = self.current_image
+        
+        grid_h, grid_w = self.patch_indices[patch_id]
+        
+        top  = grid_h * self.patch_size + random.randint(0, self.magrin_h)
+        left = grid_w * self.patch_size + random.randint(0, self.magrin_w)
 
-        return self._pil_to_tensor(Y)
+        patch = img[:, top:top+self.patch_size, left:left+self.patch_size]
 
-
-    def _pil_to_tensor(self, img):
-        t = torch.from_numpy(
-            np.array(img, dtype=np.uint8)
-        ).permute(2, 0, 1).float() / 255.0
-
-        t = t * 2 - 1   # [-1, 1]
-        return t
+        return patch
     
 
     def tensor_to_pil(self, tensor):
