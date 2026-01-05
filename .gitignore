@@ -6,6 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
+# Torch
+*.ckpt
+lightning_logs/
+
 # Distribution / packaging
 .Python
 build/
