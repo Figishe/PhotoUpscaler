@@ -10,6 +10,11 @@ __pycache__/
 *.ckpt
 lightning_logs/
 
+# inference tests
+*.jpg
+*.jpeg
+*.png
+
 # Distribution / packaging
 .Python
 build/

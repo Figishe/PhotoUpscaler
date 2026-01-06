@@ -5,16 +5,9 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 import torchvision.io as tvio
+from file_utils import parse_image_file_paths
 
 class SuperResDataset(Dataset):
-
-    def parse_image_file_paths(self, root):
-        flie_paths = []
-        for dirpath, _, filenames in os.walk(root):
-            for f in filenames:
-                if f.lower().endswith((".jpg", ".jpeg", ".png")) and not f.startswith("._"):
-                    flie_paths.append(os.path.join(dirpath, f))
-        return flie_paths
 
     current_image = None
     current_image_id = -1
@@ -30,7 +23,7 @@ class SuperResDataset(Dataset):
 
         self.patch_size = patch_size
 
-        self.flie_paths = self.parse_image_file_paths(root)
+        self.flie_paths = parse_image_file_paths(root)
 
         image_w, image_h = downscale
         patches_per_image_w = image_w // patch_size
@@ -82,7 +75,8 @@ class SuperResDataset(Dataset):
         return patch
     
 
-    def tensor_to_pil(self, tensor):
+    @staticmethod
+    def tensor_to_pil(tensor):
         t = tensor.clone()
         t = torch.clamp(t, -1.0, 1.0)
 
