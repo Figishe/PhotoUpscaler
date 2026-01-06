@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 import torchvision.io as tvio
-from file_utils import parse_image_file_paths
+from model.file_utils import parse_image_file_paths
 
 class SuperResDataset(Dataset):
 

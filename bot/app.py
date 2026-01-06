@@ -1,9 +1,14 @@
 import asyncio
 from io import BytesIO
 from PIL import Image
+
+
 from telegram import Update, Message, Document
 from telegram.ext import ApplicationBuilder, Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram import Bot
+
+from model.lit_upscaler import LitSuperResNet
+from model.inference import Inference
 
 import os
 from dotenv import load_dotenv
@@ -13,6 +18,8 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 queue = asyncio.Queue()
+
+inference: Inference
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     assert update.message, "message can't be null in start handler"
@@ -50,11 +57,10 @@ async def worker(app: Application):
 
         img = Image.open(file_bytes)
 
-        new_size = (img.width * 2, img.height * 2)
-        upscaled = img.resize(new_size, Image.BICUBIC)
+        upscaled = inference.upscale(img)
 
         out_bytes = BytesIO()
-        upscaled.save(out_bytes, format="PNG")
+        upscaled.save(out_bytes, format="JPEG", quality=95)
         out_bytes.seek(0)
 
         bot : Bot = app.bot
@@ -63,9 +69,21 @@ async def worker(app: Application):
 
         queue.task_done()
 
+
+def load_model():
+    model = LitSuperResNet.load_from_checkpoint(
+        'model/upscaler.ckpt',
+    )
+
+    global inference
+    inference = Inference(model)
+
+
 def main():
     if BOT_TOKEN is None:
         raise Exception("BOT_TOKEN should be specified in .env")
+
+    load_model()
 
     async def post_init(app):
         app.create_task(worker(app))

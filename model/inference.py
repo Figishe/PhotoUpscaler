@@ -1,15 +1,19 @@
 import torch
 import torchvision.io as tvio
+import torchvision.transforms.functional as TF
+
+from model.dataset import SuperResDataset
 
 class Inference():
     
-    def __init__(self, model, device, batch_size=32):
-        self.model = model.to(device)
-        self.device = device
+    def __init__(self, model, batch_size=32):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model = model.to(self.device)
         self.batch_size = batch_size
 
-    def predict(self, img_path):
-        img = tvio.read_image(img_path)
+    def upscale(self, img_pil):
+        img = TF.pil_to_tensor(img_pil)
+        img = img[:3, :, :]  # drop alpha if presented
         img = img.float() / 255.0
         img = img * 2 - 1
         
@@ -61,4 +65,4 @@ class Inference():
                 out_img[:, y:y+PATCH_SIZE_UPSCALED, x:x+PATCH_SIZE_UPSCALED] = patches_pred[idx]
                 idx += 1
         
-        return out_img
+        return SuperResDataset.tensor_to_pil(out_img.cpu())

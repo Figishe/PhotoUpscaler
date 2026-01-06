@@ -1,6 +1,6 @@
 import lightning as L
 import torch
-from upscaler import SuperResNet
+from model.upscaler import SuperResNet
 from torch import nn
 import torch.nn.functional as F
 from torchvision.utils import make_grid
