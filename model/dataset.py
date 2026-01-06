@@ -12,7 +12,7 @@ class SuperResDataset(Dataset):
         flie_paths = []
         for dirpath, _, filenames in os.walk(root):
             for f in filenames:
-                if f.lower().endswith((".jpg", ".jpeg")) and not f.startswith("._"):
+                if f.lower().endswith((".jpg", ".jpeg", ".png")) and not f.startswith("._"):
                     flie_paths.append(os.path.join(dirpath, f))
         return flie_paths
 
@@ -22,8 +22,12 @@ class SuperResDataset(Dataset):
     def __init__(self, 
                  root, 
                  patch_size=128, 
-                 downscale=(2808, 1872) # half-res of Canon 5dII frame
+                 downscale=(2808, 1872), # half-res of Canon 5dII frame
+                 seed=None,
                 ):
+        
+        self.rnd = random.Random(seed)
+
         self.patch_size = patch_size
 
         self.flie_paths = self.parse_image_file_paths(root)
@@ -63,15 +67,15 @@ class SuperResDataset(Dataset):
 
             # Randomize patch loading (because native shuffle=True will not work with the image cache)
             self.patch_indices = [(i,j) for i in range(self.patches_per_image_h) for j in range(self.patches_per_image_w)]
-            random.shuffle(self.patch_indices)
+            self.rnd.shuffle(self.patch_indices)
         else:
             # continue taking patches from the cached image
             img = self.current_image
         
         grid_h, grid_w = self.patch_indices[patch_id]
         
-        top  = grid_h * self.patch_size + random.randint(0, self.magrin_h)
-        left = grid_w * self.patch_size + random.randint(0, self.magrin_w)
+        top  = grid_h * self.patch_size + self.rnd.randint(0, self.magrin_h)
+        left = grid_w * self.patch_size + self.rnd.randint(0, self.magrin_w)
 
         patch = img[:, top:top+self.patch_size, left:left+self.patch_size]
 
