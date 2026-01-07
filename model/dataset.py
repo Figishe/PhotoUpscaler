@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import Dataset
 import torchvision.io as tvio
 from model.file_utils import parse_image_file_paths
+from model.image_utils import rgb_to_ycbcr_tensor
 
 class SuperResDataset(Dataset):
 
@@ -50,11 +51,14 @@ class SuperResDataset(Dataset):
         if image_id != self.current_image_id:
             # update cache
             img = tvio.read_image(self.flie_paths[image_id])
+            
             img = img.unsqueeze(0)  # add batch dim (compatible with interpolate)
             img = torch.nn.functional.interpolate(img, size=(self.image_h, self.image_w), mode="bicubic", align_corners=False)
             img = img.squeeze(0)
+
             img = img.float() / 255.0
-            img = img * 2 - 1
+            img = rgb_to_ycbcr_tensor(img)
+
             self.current_image_id = image_id
             self.current_image = img
 
@@ -73,20 +77,4 @@ class SuperResDataset(Dataset):
         patch = img[:, top:top+self.patch_size, left:left+self.patch_size]
 
         return patch
-    
-
-    @staticmethod
-    def tensor_to_pil(tensor):
-        t = tensor.clone()
-        t = torch.clamp(t, -1.0, 1.0)
-
-        arr = t.permute(1, 2, 0) # CxHxW -> HxWxC
-        arr = (arr + 1.0) / 2.0 # [0; 1]
-        arr = arr * 255 # [0; 255]
-        arr = arr.cpu().numpy()
-        arr = arr.astype(np.uint8)
-
-        img_rgb = Image.fromarray(arr, mode="RGB")
-
-        return img_rgb
 

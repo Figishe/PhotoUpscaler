@@ -4,6 +4,8 @@ import torchvision.transforms.functional as TF
 
 from model.dataset import SuperResDataset
 
+from model.image_utils import ycbcr_tensor_to_pil
+
 class Inference():
     
     def __init__(self, model, batch_size=32):
@@ -65,4 +67,4 @@ class Inference():
                 out_img[:, y:y+PATCH_SIZE_UPSCALED, x:x+PATCH_SIZE_UPSCALED] = patches_pred[idx]
                 idx += 1
         
-        return SuperResDataset.tensor_to_pil(out_img.cpu())
+        return ycbcr_tensor_to_pil(out_img.cpu())

@@ -116,7 +116,7 @@ class SuperResNet(nn.Module):
     def forward(self, x):
         # TODO: gpu augment (blur + noise)
 
-        base = F.interpolate(x, scale_factor=2, mode="bilinear", align_corners=False)
+        base = F.interpolate(x, scale_factor=2, mode="bicubic", align_corners=False)
         x = self.tail(x)
 
         x_prev = []

@@ -3,10 +3,11 @@ import torch
 from model.upscaler import SuperResNet
 from torch import nn
 import torch.nn.functional as F
-from torchvision.utils import make_grid
+from model.loss import ycbcr_weighted_mse
+from functools import partial
 
 class LitSuperResNet(L.LightningModule):
-    def __init__(self, lr=1e-6, start_channels=64, depth=2, downscale_lowres=2):
+    def __init__(self, lr=1e-6, start_channels=64, depth=2, downscale_lowres=2, lambda_y=1.0, lambda_cbcr=0.5):
         super().__init__()
         self.model = SuperResNet(start_channels=start_channels, depth=depth)
 
@@ -17,7 +18,9 @@ class LitSuperResNet(L.LightningModule):
         )
 
         self.lr = lr
-        self.loss = F.mse_loss
+        self.lambda_y = lambda_y
+        self.lambda_cbcr = lambda_cbcr
+        self.loss = partial(ycbcr_weighted_mse, weights=(lambda_y, lambda_cbcr, lambda_cbcr))
         self.downscale_lowres = downscale_lowres
         self.save_hyperparameters()
 
@@ -57,28 +60,3 @@ class LitSuperResNet(L.LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.Adam(self.parameters(), lr=self.lr)
-
-
-class ImageLoggerCallback(L.Callback):
-    def __init__(self, val_samples, log_every_n_epochs=1):
-        self.log_every_n_epochs = log_every_n_epochs
-        self.fixed_batch = next(iter(val_samples))  # HR batch
-
-    def on_validation_epoch_end(self, trainer, pl_module):
-        epoch = trainer.current_epoch
-        if epoch % self.log_every_n_epochs != 0:
-            return
-
-        pl_module.eval()
-
-        with torch.no_grad():
-            x, y = pl_module.batch_preprocess(self.fixed_batch)
-            pred = pl_module(x)
-
-        imgs = torch.cat([y.cpu(), pred.cpu()], dim=2)
-        grid = make_grid(imgs, nrow=4)
-
-        pl_module.logger.experiment.add_image(
-            "GT_vs_Pred", grid, global_step=epoch
-        )
-
