@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 class UpscaleBlock(nn.Module):
 
-    def __init__(self, in_channels, length=2, head_activation=True):
+    def __init__(self, in_channels, out_channels, length=2, head_activation=True):
         super().__init__()
         
         RELU_SLOPE = 0.1
@@ -25,7 +25,8 @@ class UpscaleBlock(nn.Module):
             )
             self.layers.add_module(module=activation, name=f'u_relu_{i}')
         
-        self.upscaler = nn.Conv2d(in_channels, in_channels * 4, kernel_size=3, padding=1)
+        self.channel_adjust = nn.Conv2d(in_channels, out_channels, kernel_size=1)
+        self.upscaler = nn.Conv2d(out_channels, out_channels * 4, kernel_size=3, padding=1)
         self.pixelshuffle = nn.PixelShuffle(upscale_factor=2)
 
         if head_activation:
@@ -38,6 +39,7 @@ class UpscaleBlock(nn.Module):
     
     def forward(self, x):
         x = self.layers(x)
+        x = self.channel_adjust(x)
         x = self.upscaler(x)
         x = self.pixelshuffle(x)
         if self.head_activation is not None:
@@ -46,7 +48,7 @@ class UpscaleBlock(nn.Module):
 
 class DownscaleBlock(nn.Module):
     
-    def __init__(self, in_channels, length=2):
+    def __init__(self, in_channels, out_channels, length=2):
         super().__init__()
         
         RELU_SLOPE = 0.1
@@ -62,7 +64,7 @@ class DownscaleBlock(nn.Module):
             self.layers.add_module(module=layer, name=f'd_conv_{in_channels}_{i}')
             self.layers.add_module(module=nn.LeakyReLU(RELU_SLOPE, inplace=True), name=f'd_relu_{i}')
 
-        self.channel_up = nn.Conv2d(in_channels, in_channels*2, kernel_size=1)
+        self.channel_up = nn.Conv2d(in_channels, out_channels, kernel_size=1)
         self.pool = nn.AvgPool2d(kernel_size=2, stride=2)
 
     def forward(self, x):
@@ -83,38 +85,39 @@ class SuperResNet(nn.Module):
 
         CHANNELS_DOWNSCALE = 2
 
-        curr_channels = start_channels
+        encoder_channels = start_channels
         skip_channels = []
         for i in range(depth):
-            block = DownscaleBlock(curr_channels)
+            block = DownscaleBlock(in_channels=encoder_channels, out_channels=encoder_channels * CHANNELS_DOWNSCALE)
             downscale_layers.append(block)
-            skip_channels.append(curr_channels)
-            curr_channels *= CHANNELS_DOWNSCALE
+            skip_channels.append(encoder_channels)
+            encoder_channels *= CHANNELS_DOWNSCALE
 
         upscale_layers = nn.ModuleList()
+        decoder_channels = encoder_channels
         for i in range(depth):
-            sum_skip_channels = sum(skip_channels[-(i+1):])
             block = UpscaleBlock(
-                in_channels=curr_channels + sum_skip_channels,
+                in_channels=decoder_channels + skip_channels[-(i+1)],
+                out_channels=decoder_channels // CHANNELS_DOWNSCALE,
                 head_activation=True
             )
             upscale_layers.append(block)
-
-        head_channels = curr_channels + sum(skip_channels)
-        upscale_layers.append(UpscaleBlock(head_channels))
+            decoder_channels //= CHANNELS_DOWNSCALE
 
         self.downscale_layers = downscale_layers
         self.upscale_layers = upscale_layers
 
+        self.final_upscale = UpscaleBlock(in_channels=decoder_channels, out_channels=decoder_channels)
+
         self.head = nn.Conv2d(
-            in_channels=head_channels,
-            out_channels=3,
+            in_channels=decoder_channels,
+            out_channels=PIC_CHANNELS,
             kernel_size=3,
             padding=1,
         )
 
     def forward(self, x):
-        # TODO: gpu augment (blur + noise)
+        # TODO: gpu augment on train (blur + noise)
 
         base = F.interpolate(x, scale_factor=2, mode="bicubic", align_corners=False)
         x = self.tail(x)
@@ -125,13 +128,13 @@ class SuperResNet(nn.Module):
             x = layer(x)
 
         for layer, skip in zip(self.upscale_layers, reversed(x_prev)):
-            # подгоняем spatial размер
             if x.shape[2:] != skip.shape[2:]:
                 skip = F.interpolate(skip, size=x.shape[2:], mode='nearest')
             x = torch.cat([x, skip], dim=1)
             x = layer(x)
-        x = self.upscale_layers[-1](x) # last layer has no skip
-
+        
+        x = self.final_upscale(x)
         x = self.head(x)
         x = F.tanh(x)
+        
         return base + x
