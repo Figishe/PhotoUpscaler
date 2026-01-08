@@ -26,6 +26,7 @@ class SuperResDataset(Dataset):
 
         self.flie_paths = parse_image_file_paths(root)
 
+        self.downscale = downscale
         if downscale is None:
             # will use native image size (assume all images have the same size in this case)
             sample_img = Image.open(self.flie_paths[0])
@@ -58,9 +59,13 @@ class SuperResDataset(Dataset):
             # update cache
             img = tvio.read_image(self.flie_paths[image_id])
             
-            img = img.unsqueeze(0)  # add batch dim (compatible with interpolate)
-            img = torch.nn.functional.interpolate(img, size=(self.image_h, self.image_w), mode="bicubic", align_corners=False)
-            img = img.squeeze(0)
+            if self.downscale is not None:
+                img = img.unsqueeze(0)  # add batch dim (compatible with interpolate)
+                img = torch.nn.functional.interpolate(img, size=(self.image_h, self.image_w), mode="bicubic", align_corners=False)
+                img = img.squeeze(0)
+            else:
+                assert img.shape[1] == self.image_h and img.shape[2] == self.image_w, \
+                f"Image size mismatch: expected ({self.image_h}x{self.image_w}) - same as first image, got ({img.shape[1]}x{img.shape[2]})"
 
             img = img.float() / 255.0
             img = rgb_to_ycbcr_tensor(img)
