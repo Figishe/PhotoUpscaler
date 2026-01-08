@@ -26,7 +26,13 @@ class SuperResDataset(Dataset):
 
         self.flie_paths = parse_image_file_paths(root)
 
-        image_w, image_h = downscale
+        if downscale is None:
+            # will use native image size (assume all images have the same size in this case)
+            sample_img = Image.open(self.flie_paths[0])
+            image_w, image_h = sample_img.size
+        else:
+            image_w, image_h = downscale
+        
         patches_per_image_w = image_w // patch_size
         patches_per_image_h = image_h // patch_size
         self.magrin_w = image_w - (patch_size * patches_per_image_w)
