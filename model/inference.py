@@ -4,7 +4,7 @@ import torchvision.transforms.functional as TF
 
 from model.dataset import SuperResDataset
 
-from model.image_utils import ycbcr_tensor_to_pil
+from model.image_utils import rgb_to_ycbcr_tensor, ycbcr_tensor_to_pil
 
 class Inference():
     
@@ -17,7 +17,7 @@ class Inference():
         img = TF.pil_to_tensor(img_pil)
         img = img[:3, :, :]  # drop alpha if presented
         img = img.float() / 255.0
-        img = img * 2 - 1
+        img = rgb_to_ycbcr_tensor(img)
         
         h, w = img.shape[1], img.shape[2]
         # split into patches of size 64x64
@@ -29,14 +29,17 @@ class Inference():
         nx = w // PATCH_SIZE
 
         patches = []
-        for iy in range(ny):
-            for ix in range(nx):
-                y = iy * PATCH_SIZE
-                x = ix * PATCH_SIZE
-                patch = img[:, :, y:y+PATCH_SIZE, x:x+PATCH_SIZE]
-                patches.append(patch)
+        if h <= PATCH_SIZE and w <= PATCH_SIZE:
+            patches = img
+        else:
+            for iy in range(ny):
+                for ix in range(nx):
+                    y = iy * PATCH_SIZE
+                    x = ix * PATCH_SIZE
+                    patch = img[:, :, y:y+PATCH_SIZE, x:x+PATCH_SIZE]
+                    patches.append(patch)
 
-        patches = torch.cat(patches, dim=0)
+            patches = torch.cat(patches, dim=0)
 
         self.model.eval()
         preds = []
@@ -52,7 +55,7 @@ class Inference():
         
         # reconstruct image from patches
         UPSCALE_FACTOR = 2 # TODO: take from model
-        PATCH_SIZE_UPSCALED = PATCH_SIZE * 2
+        PATCH_SIZE_UPSCALED = PATCH_SIZE * UPSCALE_FACTOR
         
         out_img = torch.zeros(
             (3, ny * PATCH_SIZE_UPSCALED, nx * PATCH_SIZE_UPSCALED),
