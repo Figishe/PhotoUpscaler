@@ -31,11 +31,16 @@ def rgb_to_ycbcr_tensor(rgb_in: torch.Tensor) -> torch.Tensor:
     return ycbcr
 
 
-def ycbcr_to_rgb_tensor(ycbcr: torch.Tensor) -> torch.Tensor:
+def ycbcr_to_rgb_tensor(ycbcr_in: torch.Tensor) -> torch.Tensor:
     '''
     :param ycbcr: YCbCr tensor in range [-1; 1]
     :return: RGB tensor in range [0; 1]
     '''
+    if ycbcr_in.ndim == 3:
+        ycbcr = ycbcr_in.unsqueeze(0)  # add batch
+    else:
+        ycbcr = ycbcr_in
+
     ycbcr = (ycbcr + 1) / 2  # [0,1]
     ycbcr[:,1:] -= 0.5       # remove offset
     ycbcr = ycbcr.permute(0,2,3,1)
@@ -43,14 +48,24 @@ def ycbcr_to_rgb_tensor(ycbcr: torch.Tensor) -> torch.Tensor:
     M = _YCBCR_TO_RGB_709.to(device=ycbcr.device, dtype=ycbcr.dtype)
     rgb = torch.tensordot(ycbcr, M.T, dims=1)
     rgb = rgb.clamp(0,1)
+    rgb = rgb.permute(0,3,1,2)
 
-    return rgb.permute(0,3,1,2)
+    if ycbcr_in.ndim == 3:
+        rgb = rgb.squeeze(0)  # remove batch
+
+    return rgb
 
 
 def ycbcr_tensor_to_pil(tensor: torch.Tensor) -> Image.Image:
-    rgb = ycbcr_to_rgb_tensor(tensor.unsqueeze(0))[0]
+    rgb = ycbcr_to_rgb_tensor(tensor)
     rgb = (rgb * 255).round().clamp(0,255).byte()
     return Image.fromarray(rgb.permute(1,2,0).cpu().numpy(), "RGB")
+
+
+def pil_to_lpips_tensor(img: Image.Image, device: torch.device) -> torch.Tensor:
+    rgb = torch.from_numpy(np.array(img)).to(device)
+    rgb = rgb.permute(2,0,1).unsqueeze(0).float() / 255.0
+    return rgb
 
 
 if __name__ == "__main__":
