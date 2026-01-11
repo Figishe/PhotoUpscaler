@@ -7,9 +7,24 @@ from model.loss import gradient_loss, laplacian_loss, ycbcr_mae_split
 from functools import partial
 
 class LitSuperResNet(L.LightningModule):
-    def __init__(self, lr=1e-6, start_channels=64, depth=2, downscale_lowres=2, lambda_y=1.0, lambda_cbcr=0.5, lambda_grad=0.1, lambda_laplasian=0.02):
+    def __init__(self, 
+                 lr=1e-6, 
+                 start_channels=64, 
+                 depth=2, 
+                 downscale_block_length=2,
+                 upscale_block_length=2,
+                 downscale_lowres=2, 
+                 lambda_y=1.0, 
+                 lambda_cbcr=0.5, 
+                 lambda_grad=0.1, 
+                 lambda_laplasian=0.02):
         super().__init__()
-        self.model = SuperResNet(start_channels=start_channels, depth=depth)
+
+        self.downscale_block_length = downscale_block_length
+        self.upscale_block_length = upscale_block_length
+        self.model = SuperResNet(start_channels=start_channels, depth=depth, 
+                                 downscale_block_length=downscale_block_length,
+                                 upscale_block_length=upscale_block_length)
 
         self.model = torch.compile(
             self.model,

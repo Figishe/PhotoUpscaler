@@ -76,7 +76,7 @@ class DownscaleBlock(nn.Module):
 
 class SuperResNet(nn.Module):
 
-    def __init__(self, start_channels=64, depth=3):
+    def __init__(self, start_channels=64, depth=3, upscale_block_length=2, downscale_block_length=2):
         super().__init__()
         
         PIC_CHANNELS = 3
@@ -85,10 +85,13 @@ class SuperResNet(nn.Module):
 
         CHANNELS_DOWNSCALE = 2
 
+        self.downscale_block_length = downscale_block_length
+        self.upscale_block_length = upscale_block_length
+
         encoder_channels = start_channels
         skip_channels = []
         for i in range(depth):
-            block = DownscaleBlock(in_channels=encoder_channels, out_channels=encoder_channels * CHANNELS_DOWNSCALE)
+            block = DownscaleBlock(in_channels=encoder_channels, out_channels=encoder_channels * CHANNELS_DOWNSCALE, length=downscale_block_length)
             downscale_layers.append(block)
             skip_channels.append(encoder_channels)
             encoder_channels *= CHANNELS_DOWNSCALE
@@ -99,6 +102,7 @@ class SuperResNet(nn.Module):
             block = UpscaleBlock(
                 in_channels=decoder_channels + skip_channels[-(i+1)],
                 out_channels=decoder_channels // CHANNELS_DOWNSCALE,
+                length=upscale_block_length,
                 head_activation=True
             )
             upscale_layers.append(block)
