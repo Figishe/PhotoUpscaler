@@ -88,7 +88,8 @@ class Inference():
         out_img = torch.zeros((3, H_out_up, W_out_up), device=self.device)
         out_weight = torch.zeros_like(out_img)
 
-        stride_up = stride * self.UPSCALE_FACTOR
+        overlap_up = self.OVERLAP * self.UPSCALE_FACTOR
+        stride_up = size - overlap_up
 
         for iy in range(n_patches_h):
             for ix in range(n_patches_w):
@@ -96,8 +97,9 @@ class Inference():
                 x = ix * stride_up
                 y = iy * stride_up
                 patch_h, patch_w = patches_pred[idx].shape[-2:]
-                out_img[:, y:y+patch_h, x:x+patch_w] += patches_pred[idx]
-                out_weight[:, y:y+patch_h, x:x+patch_w] += self.patch_blend_mask[:, :patch_h, :patch_w]
+                mask_patch = self.patch_blend_mask[:, :patch_h, :patch_w]
+                out_img[:, y:y+patch_h, x:x+patch_w] += patches_pred[idx] * mask_patch
+                out_weight[:, y:y+patch_h, x:x+patch_w] += mask_patch
 
         out_img = out_img / out_weight.clamp(min=1e-6)
         return out_img
