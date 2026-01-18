@@ -54,25 +54,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def worker(app: Application):
     while True:
         chat_id, file_bytes, file_name_raw = await queue.get()
+        file_name, file_ext = file_name_raw.rsplit('.', 1)
 
         img = Image.open(file_bytes)
 
         upscaled = inference.upscale(img)
 
         out_bytes = BytesIO()
-        upscaled.save(out_bytes, format="JPEG", quality=95)
+        upscaled.save(out_bytes, format=img.format, quality=95 if img.format == "JPEG" else None)
         out_bytes.seek(0)
-
-        bot : Bot = app.bot
-        file_name, file_ext = file_name_raw.rsplit('.', 1)
-        await bot.send_document(chat_id, document=out_bytes, filename=f'{file_name}.x2.{file_ext}')
+        
+        await app.bot.send_document(chat_id, document=out_bytes, filename=f'{file_name}.x2.{file_ext}')
 
         queue.task_done()
 
 
 def load_model():
     model = LitSuperResNet.load_from_checkpoint(
-        'model/upscaler.ckpt',
+        'checkpoints/upscaler.ckpt',
     )
 
     global inference

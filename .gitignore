@@ -7,7 +7,7 @@ __pycache__/
 *.so
 
 # Torch
-*.ckpt
+model/checkpoints/
 lightning_logs/
 
 # inference tests
