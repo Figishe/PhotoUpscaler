@@ -66,11 +66,3 @@ def pil_to_lpips_tensor(img: Image.Image, device: torch.device) -> torch.Tensor:
     rgb = torch.from_numpy(np.array(img)).to(device)
     rgb = rgb.permute(2,0,1).unsqueeze(0).float() / 255.0
     return rgb
-
-
-if __name__ == "__main__":
-    rgb = torch.rand(1,3,128,128, device="cuda")
-    y = rgb_to_ycbcr_tensor(rgb)
-    rgb2 = ycbcr_to_rgb_tensor(y)
-
-    print(f"rgb-ycbcr conversion error = {(rgb - rgb2).abs().max()}")
