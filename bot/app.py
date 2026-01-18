@@ -2,7 +2,7 @@ import asyncio
 from io import BytesIO
 from PIL import Image
 
-
+import telegram
 from telegram import Update, Message, Document
 from telegram.ext import ApplicationBuilder, Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram import Bot
@@ -43,13 +43,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"Незнакомый тип файла {document.mime_type}; поддерживаются jped, png и др.")
         return
 
-    file = await document.get_file()
+    try:
+        file = await document.get_file()
+    except telegram.error.TelegramError as e:
+        if "File is too big" in str(e):
+            await update.message.reply_text(f"😢 Извините, Telegram не даёт мне скачать такой большой файл.\n"
+                    "Попробуйте отправить файл весом поменьше, например, в поджатом jpeg."
+                )
+        
+        return
+    
     file_bytes = BytesIO()
     await file.download_to_memory(out=file_bytes)
     file_bytes.seek(0)
 
+    await update.message.reply_text("Файл принят. Скоро скину увеличенный... ⏳")
     await queue.put((update.effective_chat.id, file_bytes, document.file_name))
-    await update.message.reply_text("Файл принят. Начинаем обработку...")
+    
 
 async def worker(app: Application):
     while True:
@@ -63,8 +73,19 @@ async def worker(app: Application):
         out_bytes = BytesIO()
         upscaled.save(out_bytes, format=img.format, quality=95 if img.format == "JPEG" else None)
         out_bytes.seek(0)
+        out_size_mb = out_bytes.getbuffer().nbytes / (1024 * 1024)
         
-        await app.bot.send_document(chat_id, document=out_bytes, filename=f'{file_name}.x2.{file_ext}')
+        try:
+            await app.bot.send_document(chat_id, document=out_bytes, filename=f'{file_name}.x2.{file_ext}')
+        except telegram.error.BadRequest as e:
+            if "File is too big" in str(e):
+                await app.bot.send_message(
+                    chat_id,
+                    f"😢 Извините, Telegram не даёт мне вернуть вам файл размером {out_size_mb:.1f} Mb.\n"
+                    "Попробуйте отправить файл весом поменьше, например, в поджатом jpeg."
+                )
+            else:
+                await app.bot.send_message(chat_id, f"😢 Не получилось отправить вам результат: {e}")
 
         queue.task_done()
 
