@@ -10,16 +10,37 @@ from model.image_utils import rgb_to_ycbcr_tensor
 
 class SuperResDataset(Dataset):
 
+    """
+    Docstring for SuperResDataset
+
+    SuperResDataset is a PyTorch Dataset for loading image patches for super-resolution training.
+    It loads images from a specified root directory, 
+    optionally downscales them to make all images uniform in size / also reduce camera-specific noise, 
+    and extracts random patches sequentially filling the complete patch grid for each image (maximize data utilization).
+
+    NOTE: The dataset is stateful: it caches the current image to optimize patch extraction and reduce CPU bottleneck.
+    It should not be used with `shuffle=True` in DataLoader, as it implements its own randomization for patch selection.
+    """
+
     current_image = None
     current_image_id = -1
 
     def __init__(self, 
-                 root, 
-                 patch_size=128, 
-                 downscale=(2808, 1872), # half-res of Canon 5dII frame
-                 seed=None,
+                 root: str, 
+                 patch_size: int = 128, 
+                 downscale: tuple[int, int] = (1280, 720),
+                 seed: int | None = None,
                 ):
+        """
+        Docstring for __init__
         
+        :param root: Root directory containing images (may include subdirectories)
+        :param patch_size: Size of square patches to extract
+        :param downscale: Target size to downscale images to (None means use native size - assumes all images have the same size)
+        :param seed: Random seed for patch selection
+        """
+
+
         self.rnd = random.Random(seed)
 
         self.patch_size = patch_size
