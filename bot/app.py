@@ -2,6 +2,9 @@ import asyncio
 from io import BytesIO
 from PIL import Image
 
+import pillow_heif
+pillow_heif.register_heif_opener()
+
 import telegram
 from telegram import Update, Message, Document
 from telegram.ext import ApplicationBuilder, Application, CommandHandler, MessageHandler, filters, ContextTypes
@@ -36,7 +39,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     document = update.message.document
     if not document:
-        await update.message.reply_text("Пожалуйста, отправьте файл изображения")
+        await update.message.reply_text("Готов увеличивать, просто отправьте файл изображения")
         return
     
     if document.mime_type is None or not document.mime_type.startswith("image/"):
