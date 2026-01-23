@@ -9,6 +9,15 @@ This project contains:
 - notebooks for training and testing the model locally
 - telegram bot implementation for interactive upscaling
 
+# Inference Examples
+
+Here are some examples comparing image patches scaled by my model, using traditional algorithms and by 3rd party model:
+
+![Compare 1](images/compare-1.png)
+![Compare 2](images/compare-2.png)
+![Compare 3](images/compare-3.png)
+
+
 # Usage
 
 **IMPORTANT:** 
