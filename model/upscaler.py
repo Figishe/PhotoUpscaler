@@ -26,8 +26,7 @@ class UpscaleBlock(nn.Module):
             self.layers.add_module(module=activation, name=f'u_relu_{i}')
         
         self.channel_adjust = nn.Conv2d(in_channels, out_channels, kernel_size=1)
-        self.upscaler = nn.Conv2d(out_channels, out_channels * 4, kernel_size=3, padding=1)
-        self.pixelshuffle = nn.PixelShuffle(upscale_factor=2)
+        self.up_conv = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
 
         if head_activation:
             self.head_activation = nn.LeakyReLU(
@@ -40,8 +39,8 @@ class UpscaleBlock(nn.Module):
     def forward(self, x):
         x = self.layers(x)
         x = self.channel_adjust(x)
-        x = self.upscaler(x)
-        x = self.pixelshuffle(x)
+        x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False)
+        x = self.up_conv(x)
         if self.head_activation is not None:
             x = self.head_activation(x)
         return x
@@ -123,7 +122,7 @@ class SuperResNet(nn.Module):
     def forward(self, x):
         # TODO: gpu augment on train (blur + noise)
 
-        base = F.interpolate(x, scale_factor=2, mode="bicubic", align_corners=False)
+        base = F.interpolate(x, scale_factor=2, mode="bilinear", align_corners=False)
         x = self.tail(x)
 
         x_prev = []
