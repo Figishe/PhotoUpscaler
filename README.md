@@ -29,7 +29,7 @@ Use `git lfs install` before cloning repo, otherwise pre-trained model weights w
 - Follow the instructions in the notebook
 
 ### Testing the model
-- Open the `notebooks/test_model.ipynb` (for testing raw patches) or `notebooks/test_inference.ipynb` (for testing final image assembling)
+- Open the `notebooks/test_patches.ipynb` (for testing raw patches) or `notebooks/test_inference.ipynb` (for testing final image assembling)
 - Follow the instructions in the notebook
 
 ### Deploying a telegram bot
