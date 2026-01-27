@@ -18,7 +18,8 @@ class LitSuperResNet(L.LightningModule):
                  lambda_cbcr=0.5, 
                  lambda_grad=0.1, 
                  lambda_laplasian=0.02,
-                 lambda_tiny=0.1
+                 lambda_tiny=0.1,
+                 loss_warmup_epochs=0,
         ):
         super().__init__()
 
@@ -40,6 +41,7 @@ class LitSuperResNet(L.LightningModule):
         self.lambda_grad = lambda_grad
         self.lambda_laplasian = lambda_laplasian
         self.lambda_tiny = lambda_tiny
+        self.loss_warmup_epochs = loss_warmup_epochs
 
         self.downscale_lowres = downscale_lowres
         self.save_hyperparameters()
@@ -96,6 +98,8 @@ class LitSuperResNet(L.LightningModule):
         return x, y
 
     def loss(self, pred, target, mode):
+        is_warmup = self.loss_warmup_epochs > 0 and self.current_epoch < self.loss_warmup_epochs
+
         total_loss = 0.0
 
         if self.lambda_y > 0 or self.lambda_cbcr > 0:
@@ -104,17 +108,17 @@ class LitSuperResNet(L.LightningModule):
             self.log(f"{mode}/loss_y", mae_y, on_epoch=True, on_step=False, prog_bar=False)
             self.log(f"{mode}/loss_cbcr", mae_cbcr, on_epoch=True, on_step=False, prog_bar=False)
         
-        if self.lambda_grad > 0:
+        if not is_warmup and self.lambda_grad > 0:
             grad = gradient_loss(pred, target)
             total_loss += self.lambda_grad * grad
             self.log(f"{mode}/loss_grad", grad, on_epoch=True, on_step=False, prog_bar=False)
 
-        if self.lambda_laplasian > 0:
+        if not is_warmup and self.lambda_laplasian > 0:
             laplasian = laplacian_loss(pred, target)
             total_loss += self.lambda_laplasian * laplasian
             self.log(f"{mode}/loss_laplasian", laplasian, on_epoch=True, on_step=False, prog_bar=False)
 
-        if self.lambda_tiny > 0:
+        if not is_warmup and self.lambda_tiny > 0:
             pred_tiny, gt_tiny = self.random_crop_pair(pred, target, size=3)
             tiny_loss = self.invariant_tiny_loss(pred_tiny, gt_tiny)
             total_loss += self.lambda_tiny * tiny_loss
