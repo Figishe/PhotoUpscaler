@@ -89,15 +89,6 @@ def laplacian_loss(pred, target):
     return lap_loss
 
 
-def combined_mae_grad_lap_loss(pred, target, lambda_y, lambda_cbcr, lambda_grad, lambda_laplasian):
-    mae = ycbcr_weighted_mae(pred, target, weights=(lambda_y, lambda_cbcr, lambda_cbcr))
-    grad = gradient_loss(pred, target)
-    lap = laplacian_loss(pred, target)
-
-    total_loss = mae + lambda_grad * grad + lambda_laplasian * lap
-    return total_loss
-
-
 def rotations(x):
     return [
         x,
