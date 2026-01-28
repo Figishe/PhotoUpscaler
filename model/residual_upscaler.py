@@ -47,9 +47,8 @@ class UpscaleBlock(nn.Module):
         out_channels = channels // 4
 
         self.post = nn.Sequential(
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
-            nn.LeakyReLU(RELU_SLOPE, inplace=True),
-            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, groups=out_channels), # per-channel mixing
+            nn.Conv2d(out_channels, out_channels, kernel_size=1), # soft per-pixel channel mixing
         )
 
     def forward(self, x):
