@@ -1,6 +1,6 @@
 import lightning as L
 import torch
-from model.upscaler import SuperResNet
+from model.unet_upscaler import SuperResNet
 from torch import nn
 import torch.nn.functional as F
 from model.loss import gradient_loss, laplacian_loss, ycbcr_mae_split, invariant_tiny_loss, random_crop_pair

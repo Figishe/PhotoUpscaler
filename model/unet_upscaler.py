@@ -26,7 +26,8 @@ class UpscaleBlock(nn.Module):
             self.layers.add_module(module=activation, name=f'u_relu_{i}')
         
         self.channel_adjust = nn.Conv2d(in_channels, out_channels, kernel_size=1)
-        self.up_conv = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1)
+        self.upscaler = nn.Conv2d(out_channels, out_channels * 4, kernel_size=3, padding=1)
+        self.pixelshuffle = nn.PixelShuffle(upscale_factor=2)
 
         if head_activation:
             self.head_activation = nn.LeakyReLU(
@@ -39,8 +40,8 @@ class UpscaleBlock(nn.Module):
     def forward(self, x):
         x = self.layers(x)
         x = self.channel_adjust(x)
-        x = F.interpolate(x, scale_factor=2, mode='bilinear', align_corners=False)
-        x = self.up_conv(x)
+        x = self.upscaler(x)
+        x = self.pixelshuffle(x)
         if self.head_activation is not None:
             x = self.head_activation(x)
         return x
@@ -92,7 +93,7 @@ class SuperResNet(nn.Module):
         for i in range(depth):
             block = DownscaleBlock(in_channels=encoder_channels, out_channels=encoder_channels * CHANNELS_DOWNSCALE, length=downscale_block_length)
             downscale_layers.append(block)
-            skip_channels.append(encoder_channels)
+            skip_channels.append(encoder_channels * CHANNELS_DOWNSCALE)
             encoder_channels *= CHANNELS_DOWNSCALE
 
         upscale_layers = nn.ModuleList()
@@ -122,22 +123,22 @@ class SuperResNet(nn.Module):
     def forward(self, x):
         # TODO: gpu augment on train (blur + noise)
 
-        base = F.interpolate(x, scale_factor=2, mode="bilinear", align_corners=False)
         x = self.tail(x)
 
         x_prev = []
         for layer in self.downscale_layers:
-            x_prev.append(x)
             x = layer(x)
+            x_prev.append(x)
 
         for layer, skip in zip(self.upscale_layers, reversed(x_prev)):
             if x.shape[2:] != skip.shape[2:]:
+                assert (x.shape[2:] - skip.shape[2:]).abs().mean() < 2, "Skip interpolation should be only performed to fix 1-pixel wide mismatch"
                 skip = F.interpolate(skip, size=x.shape[2:], mode='nearest')
             x = torch.cat([x, skip], dim=1)
             x = layer(x)
         
         x = self.final_upscale(x)
         x = self.head(x)
-        x = F.tanh(x)
-        
-        return base + x
+        x = torch.clamp(x, -1.0, 1.0)
+
+        return x
