@@ -3,7 +3,7 @@ import torch
 from model.unet_upscaler import SuperResNet
 from torch import nn
 import torch.nn.functional as F
-from model.loss import gradient_loss, laplacian_loss, ycbcr_mae_split, invariant_tiny_loss, random_crop_pair
+from model.loss import gradient_loss, laplacian_loss, ycbcr_mae_split, invariant_tiny_loss, random_crop_pair, checkerboard_loss
 from functools import partial
 
 class LitSuperResNet(L.LightningModule):
@@ -19,6 +19,7 @@ class LitSuperResNet(L.LightningModule):
                  lambda_grad=0.1, 
                  lambda_laplasian=0.02,
                  lambda_tiny=0.1,
+                 lambda_checkerboard=0.02,
                  loss_warmup_epochs=0,
         ):
         super().__init__()
@@ -41,6 +42,7 @@ class LitSuperResNet(L.LightningModule):
         self.lambda_grad = lambda_grad
         self.lambda_laplasian = lambda_laplasian
         self.lambda_tiny = lambda_tiny
+        self.lambda_checkerboard = lambda_checkerboard
         self.loss_warmup_epochs = loss_warmup_epochs
 
         self.downscale_lowres = downscale_lowres
@@ -91,6 +93,11 @@ class LitSuperResNet(L.LightningModule):
             tiny_loss = invariant_tiny_loss(pred_tiny, gt_tiny)
             total_loss += self.lambda_tiny * tiny_loss
             self.log(f"{mode}/loss_tiny", tiny_loss, on_epoch=True, on_step=False, prog_bar=False)
+        
+        if not is_warmup and self.lambda_checkerboard > 0:
+            cb_loss = checkerboard_loss(pred)
+            total_loss += self.lambda_checkerboard * cb_loss
+            self.log(f"{mode}/loss_checkerboard", cb_loss, on_epoch=True, on_step=False, prog_bar=False)
         
         self.log(f"{mode}/loss", total_loss, on_epoch=True, on_step=False, prog_bar=True)
 

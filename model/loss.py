@@ -117,3 +117,14 @@ def random_crop_pair(pred, target, size=3):
     pred_crop = pred[..., i:i+size, j:j+size]
     tgt_crop  = target[..., i:i+size, j:j+size]
     return pred_crop, tgt_crop
+
+def checkerboard_loss(x):
+    a = x[..., 0::2, 0::2]
+    b = x[..., 0::2, 1::2]
+    c = x[..., 1::2, 0::2]
+    d = x[..., 1::2, 1::2]
+    return (
+        (a - b).abs().mean() +
+        (a - c).abs().mean() +
+        (a - d).abs().mean()
+    )
