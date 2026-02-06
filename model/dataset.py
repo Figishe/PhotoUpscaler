@@ -30,6 +30,7 @@ class SuperResDataset(Dataset):
                  patch_size: int = 128, 
                  downscale: tuple[int, int] = (1280, 720),
                  seed: int | None = None,
+                 shuffle: bool = True,
                 ):
         """
         Docstring for __init__
@@ -42,6 +43,7 @@ class SuperResDataset(Dataset):
 
 
         self.rnd = random.Random(seed)
+        self.shuffle = shuffle
 
         self.patch_size = patch_size
 
@@ -96,7 +98,8 @@ class SuperResDataset(Dataset):
 
             # Randomize patch loading (because native shuffle=True will not work with the image cache)
             self.patch_indices = [(i,j) for i in range(self.patches_per_image_h) for j in range(self.patches_per_image_w)]
-            self.rnd.shuffle(self.patch_indices)
+            if self.shuffle:
+                self.rnd.shuffle(self.patch_indices)
         else:
             # continue taking patches from the cached image
             img = self.current_image
