@@ -10,7 +10,7 @@ from telegram import Update, Message, Document
 from telegram.ext import ApplicationBuilder, Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram import Bot
 
-from model.upscaler_legacy_v1 import LitSuperResNetV1 as LitSuperResNet
+from model.unet_upscaler_v1 import LitSuperResNetV1 as LitSuperResNet
 from model.inference import Inference
 
 import os
@@ -60,7 +60,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await file.download_to_memory(out=file_bytes)
     file_bytes.seek(0)
 
-    await update.message.reply_text("Файл принят. Скоро скину увеличенный... ⏳")
+    await update.message.reply_text(f"⏳ Изображение принято. Скоро скину увеличенное... ")
     await queue.put((update.effective_chat.id, file_bytes, document.file_name))
     
 
@@ -80,6 +80,7 @@ async def worker(app: Application):
         
         try:
             await app.bot.send_document(chat_id, document=out_bytes, filename=f'{file_name}.x2.{file_ext}')
+            await app.bot.send_message(chat_id, f"✅ Готово, вот увеличенное изображение размера {upscaled.width}x{upscaled.height}")
         except telegram.error.BadRequest as e:
             if "File is too big" in str(e):
                 await app.bot.send_message(
