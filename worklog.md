@@ -111,24 +111,14 @@ $$
 
 Image gradients are computed per-channel using convolution:
 
-$$
-G_x(x) = x * K_x
-$$
+$$G_x(x) = x * K_x$$
 
-$$
-G_y(x) = x * K_y
-$$
+$$G_y(x) = x * K_y$$
 
 The gradient loss is defined as the sum of L1 distances between
 predicted and ground-truth gradients:
 
-$$
-\mathcal{L}_{\mathrm{grad}}(x_{\mathrm{pred}}, x_{\mathrm{gt}})
-=
-\left\| G_x(x_{\mathrm{pred}}) - G_x(x_{\mathrm{gt}}) \right\|_1
-+
-\left\| G_y(x_{\mathrm{pred}}) - G_y(x_{\mathrm{gt}}) \right\|_1
-$$
+$$\mathcal{L}_{\mathrm{grad}}(x_{\mathrm{pred}}, x_{\mathrm{gt}})=\left\| G_x(x_{\mathrm{pred}}) - G_x(x_{\mathrm{gt}}) \right\|_1+\left\| G_y(x_{\mathrm{pred}}) - G_y(x_{\mathrm{gt}}) \right\|_1$$
 
 #### Laplacian loss
 
@@ -153,11 +143,7 @@ $$
 
 Then the loss is computed as an L1 difference:
 
-$$
-\mathcal{L}_{\mathrm{lap}}(x_{\mathrm{pred}}, x_{\mathrm{gt}})
-=
-\left\| \Delta x_{\mathrm{pred}} - \Delta x_{\mathrm{gt}} \right\|_1
-$$
+$$\mathcal{L}_{\mathrm{lap}}(x_{\mathrm{pred}}, x_{\mathrm{gt}})=\left\| \Delta x_{\mathrm{pred}} - \Delta x_{\mathrm{gt}} \right\|_1$$
 
 #### Loss summary
 
