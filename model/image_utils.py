@@ -2,6 +2,7 @@ from PIL import Image
 import torch
 import numpy as np
 
+# https://web.archive.org/web/20120403123714/http://www.equasys.de/colorconversion.html
 _RGB_TO_YCBCR_709 = torch.tensor([
     [ 0.2126,  0.7152,  0.0722],
     [-0.114572, -0.385428,  0.5],
