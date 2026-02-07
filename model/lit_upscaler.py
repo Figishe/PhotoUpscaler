@@ -1,6 +1,8 @@
 import lightning as L
 import torch
-from model.residual_upscaler import SuperResNet
+from model.unet_upscaler_v2 import SuperResNet as UnetV2
+from model.unet_upscaler_v1 import SuperResNet as UnetV1
+from model.residual_upscaler import SuperResNet as ResidualNet
 from torch import nn
 import torch.nn.functional as F
 from model.loss import gradient_loss, laplacian_loss, ycbcr_mae_split, invariant_tiny_loss, random_crop_pair, checkerboard_loss
@@ -8,11 +10,22 @@ from functools import partial
 
 class LitSuperResNet(L.LightningModule):
     def __init__(self, 
-                 lr=1e-6, 
+                 arch,
+                 downscale_lowres=2,
+
+                 # arch: unet-specific
+                 start_channels=64, 
+                 depth=2, 
+                 downscale_block_length=2,
+                 upscale_block_length=2,
+
+                 # arch: residual-specific
                  channels=64, 
                  num_blocks=2, 
                  block_length=2,
-                 downscale_lowres=2, 
+                 
+                 # loss
+                 lr=1e-6, 
                  lambda_y=1.0, 
                  lambda_cbcr=0.5, 
                  lambda_grad=0.1, 
@@ -23,8 +36,43 @@ class LitSuperResNet(L.LightningModule):
         ):
         super().__init__()
 
-        self.downscale_block_length = block_length
-        self.model = SuperResNet(channels=channels, num_blocks=num_blocks, block_length=block_length)
+        self.arch = arch
+
+        if 'unet' in arch:
+            self.downscale_block_length = downscale_block_length
+            self.upscale_block_length = upscale_block_length
+            self.start_channels = start_channels
+            self.depth = depth
+
+            if 'v2' in arch:
+                self.model = UnetV2(
+                    start_channels=start_channels, 
+                    depth=depth, 
+                    downscale_block_length=downscale_block_length,
+                    upscale_block_length=upscale_block_length
+                )
+            elif 'v1' in arch:
+                self.model = UnetV1(
+                    start_channels=start_channels, 
+                    depth=depth, 
+                    downscale_block_length=downscale_block_length,
+                    upscale_block_length=upscale_block_length
+                )
+            else:
+                raise ValueError(f"Unknown unet architecture version in {arch}")
+        
+        elif 'residual' in arch:
+            self.channels = channels
+            self.block_length = block_length
+            self.num_blocks = num_blocks
+
+            self.model = ResidualNet(
+                channels=channels,
+                num_blocks=num_blocks,
+                block_length=block_length
+            )
+        else:
+            raise ValueError(f"Unknown architecture {arch}")
 
         self.model = torch.compile(
             self.model,
@@ -89,7 +137,7 @@ class LitSuperResNet(L.LightningModule):
             tiny_loss = invariant_tiny_loss(pred_tiny, gt_tiny)
             total_loss += self.lambda_tiny * tiny_loss
             self.log(f"{mode}/loss_tiny", tiny_loss, on_epoch=True, on_step=False, prog_bar=False)
-
+        
         if not is_warmup and self.lambda_checkerboard > 0:
             cb_loss = checkerboard_loss(pred)
             total_loss += self.lambda_checkerboard * cb_loss

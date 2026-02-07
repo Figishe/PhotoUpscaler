@@ -121,7 +121,7 @@ class SuperResNet(nn.Module):
         )
 
     def forward(self, x):
-        # TODO: gpu augment on train (blur + noise)
+        base = F.interpolate(x, scale_factor=2, mode="bicubic", align_corners=False)
 
         x = self.tail(x)
 
@@ -139,6 +139,6 @@ class SuperResNet(nn.Module):
         
         x = self.final_upscale(x)
         x = self.head(x)
-        x = torch.clamp(x, -1.0, 1.0)
-
-        return x
+        x = F.tanh(x)
+        
+        return base + x
