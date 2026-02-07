@@ -4,13 +4,6 @@ import torch.nn.functional as F
 import lightning as L
 
 
-'''
-Older version of upscaler model based on PixelShuffle blocks 
-(resulting in checkerboard artifacts)
-Used for comparisons.
-'''
-
-
 class UpscaleBlock(nn.Module):
 
     def __init__(self, in_channels, out_channels, length=2, head_activation=True):
@@ -130,8 +123,6 @@ class SuperResNet(nn.Module):
         )
 
     def forward(self, x):
-        # TODO: gpu augment on train (blur + noise)
-
         base = F.interpolate(x, scale_factor=2, mode="bicubic", align_corners=False)
         x = self.tail(x)
 
