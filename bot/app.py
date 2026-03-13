@@ -10,7 +10,7 @@ from telegram import Update, Message, Document
 from telegram.ext import ApplicationBuilder, Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram import Bot
 
-from model.unet_upscaler_v1 import LitSuperResNetV1 as LitSuperResNet
+from model.lit_upscaler import LitSuperResNet
 from model.inference import Inference
 
 import os
@@ -95,9 +95,9 @@ async def worker(app: Application):
 
 
 def load_model():
-    # TODO: support versioning
     model = LitSuperResNet.load_from_checkpoint(
         'checkpoints/upscaler.ckpt',
+        arch='unet_v1',
     )
 
     global inference
